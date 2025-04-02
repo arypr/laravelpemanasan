@@ -2,104 +2,126 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Models\AccountReceivable;
-use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class AccountReceivableController extends Controller
 {
-    /**
-     * Get list of receivables with pagination.
-     *
-     * @param  Request  $request
-     * @return JsonResponse
-     */
-    public function index(Request $request): JsonResponse
+    // Fungsi untuk membuat hutang (Create Hutang)
+    public function store(Request $request)
     {
-        $page = $request->query('page', 1);
-        $pageSize = $request->query('pageSize', 10);
-
-        // Mengambil data dengan paginasi
-        $receivables = AccountReceivable::paginate($pageSize, ['*'], 'page', $page);
-
-        // Mengubah data ke format yang sesuai
-        $data = $receivables->map(function ($receivable) {
-            return [
-                'serial' => $receivable->receivable_id, // sesuai dengan kolom receivable_id
-                'transactionId' => $receivable->transaction_id,
-                'totalAmount' => $receivable->total_amount,
-                'totalOutstandingAmount' => $receivable->total_outstanding_amount,
-                'status' => $receivable->status,
-                'repaymentDueDate' => $receivable->repayment_due_date->toIso8601String(),
-                'createdAt' => $receivable->created_at->toIso8601String(),
-                'updatedAt' => $receivable->updated_at->toIso8601String(),
-                'createdBy' => $receivable->created_by,
-                'updatedBy' => $receivable->updated_by,
-            ];
-        });
-
-        return response()->json([
-            'data' => [
-                'receivables' => $data,
-            ],
-            'page' => $receivables->currentPage(),
-            'pageSize' => $receivables->perPage(),
-            'status' => 200,
-            'message' => 'success'
-        ]);
-    }
-
-    /**
-     * Store a new receivable record.
-     *
-     * @param  Request  $request
-     * @return JsonResponse
-     */
-    public function store(Request $request): JsonResponse
-    {
+        // Validasi input
         $validated = $request->validate([
-            'serial' => 'required|string|unique:account_receivables,serial',
-            'transactionId' => 'required|string',
-            'totalAmount' => 'required|numeric',
-            'totalOutstandingAmount' => 'required|numeric',
+            'receivable_id' => 'required',
+            'transaction_id' => 'required',
+            'total_amount' => 'required|numeric',
+            'total_outstanding_amount' => 'required|numeric',
             'status' => 'required|string',
-            'repaymentDueDate' => 'required|date',
-            'createdBy' => 'required|string',
+            'repayment_due_date' => 'required|date',
+            'created_by' => 'required|string',
         ]);
 
-        $receivable = AccountReceivable::create(array_merge($validated, [
-            'updatedBy' => $validated['createdBy'],  // Menambahkan updatedBy yang diambil dari createdBy
-        ]));
+        // Simpan data baru ke dalam tabel account_receivables
+        $accountReceivable = AccountReceivable::create([
+            'receivable_id' => $validated['receivable_id'],
+            'transaction_id' => $validated['transaction_id'],
+            'total_amount' => $validated['total_amount'],
+            'total_outstanding_amount' => $validated['total_outstanding_amount'],
+            'status' => $validated['status'],
+            'repayment_due_date' => $validated['repayment_due_date'],
+            'created_by' => $validated['created_by'],
+            'updated_by' => $validated['created_by'], // Misalnya, yang mengupdate pertama kali adalah orang yang sama dengan yang membuat
+        ]);
 
+        // Format response sesuai dengan format yang diminta
         return response()->json([
-            'data' => $receivable,
             'status' => 201,
-            'message' => 'Receivable created successfully'
+            'message' => 'Hutang berhasil dibuat',
+            'data' => $accountReceivable,
         ], 201);
     }
 
-    /**
-     * Update an existing receivable.
-     *
-     * @param  Request  $request
-     * @param  AccountReceivable  $accountReceivable
-     * @return JsonResponse
-     */
-    public function update(Request $request, AccountReceivable $accountReceivable): JsonResponse
+    // Fungsi untuk memperbarui hutang (Update Hutang)
+    public function update(Request $request, $id)
     {
+        // Validasi input
         $validated = $request->validate([
-            'totalOutstandingAmount' => 'sometimes|numeric',
-            'status' => 'sometimes|string',
-            'updatedBy' => 'required|string',
+            'total_amount' => 'required|numeric',
+            'total_outstanding_amount' => 'required|numeric',
+            'status' => 'required|string',
+            'repayment_due_date' => 'required|date',
+            'updated_by' => 'required|string',
         ]);
 
-        // Mengupdate data account receivable
-        $accountReceivable->update($validated);
+        // Cari record hutang berdasarkan ID
+        $accountReceivable = AccountReceivable::find($id);
+
+        if (!$accountReceivable) {
+            return response()->json([
+                'status' => 404,
+                'message' => 'Hutang tidak ditemukan'
+            ], 404);
+        }
+
+        // Update data hutang
+        $accountReceivable->update([
+            'total_amount' => $validated['total_amount'],
+            'total_outstanding_amount' => $validated['total_outstanding_amount'],
+            'status' => $validated['status'],
+            'repayment_due_date' => $validated['repayment_due_date'],
+            'updated_by' => $validated['updated_by'],
+        ]);
+
+        // Format response sesuai dengan format yang diminta
+        return response()->json([
+            'status' => 200,
+            'message' => 'Hutang berhasil diperbarui',
+            'data' => $accountReceivable,
+        ], 200);
+    }
+
+
+    // Fungsi untuk mendapatkan daftar hutang dengan filter dan paginasi
+    public function getAccountReceivable(Request $request)
+    {
+        $query = AccountReceivable::query();
+
+        // Filter berdasarkan transactionIds (dipisah dengan koma)
+        if ($request->has('transactionIds')) {
+            $transactionIds = explode(',', $request->query('transactionIds'));
+            $query->whereIn('transaction_id', $transactionIds);
+        }
+
+        // Filter berdasarkan status
+        if ($request->has('status')) {
+            $query->where('status', $request->query('status'));
+        }
+
+        // Ambil nilai page dan pageSize
+        $pageSize = $request->query('pageSize', 10); // Default 10 jika tidak ada
+        $receivables = $query->paginate($pageSize);
 
         return response()->json([
-            'data' => $accountReceivable,
             'status' => 200,
-            'message' => 'Receivable updated successfully'
+            'message' => 'success',
+            'data' => [
+                'receivables' => $receivables->map(function ($item) {
+                    return [
+                        'receivable_id' => $item->receivable_id,
+                        'transactionId' => $item->transaction_id,
+                        'totalAmount' => $item->total_amount,
+                        'totalOutstandingAmount' => $item->total_outstanding_amount,
+                        'status' => $item->status,
+                        'repaymentDueDate' => $item->repayment_due_date,
+                        'createdAt' => $item->created_at,
+                        'updatedAt' => $item->updated_at,
+                        'createdBy' => $item->created_by,
+                        'updatedBy' => $item->updated_by,
+                    ];
+                }),
+                'page' => $receivables->currentPage(),
+                'pageSize' => $receivables->perPage(),
+            ],
         ]);
     }
 }

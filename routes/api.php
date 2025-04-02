@@ -23,9 +23,9 @@ Route::post('/product/{id}/add-quantity', [ProductController::class, 'addQuantit
 Route::post('/product/{id}/deduct-quantity', [ProductController::class, 'deductQuantityProduct']);
 
 // Routes untuk Account Receivable
-Route::get('/receivables', [AccountReceivableController::class, 'index']);
-Route::post('/receivables', [AccountReceivableController::class, 'store']);
-Route::put('/receivables/{id}', [AccountReceivableController::class, 'update']);
+Route::post('/account_receivables', [AccountReceivableController::class, 'store']);
+Route::put('/account_receivables/{id}', [AccountReceivableController::class, 'update']);
+Route::get('/cashier/account/receivable', [AccountReceivableController::class, 'getAccountReceivable']);
 
 
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {

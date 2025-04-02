@@ -17,9 +17,9 @@ return new class extends Migration
             $table->id();
             $table->timestamps();
             $table->string("name");
-            $table->string("description");
-            $table->string("quantity");
-            $table->string("price");
+            $table->text("description"); // Bisa menggunakan text jika deskripsi cukup panjang
+            $table->integer("quantity"); // Diganti jadi integer jika menyimpan jumlah produk
+            $table->decimal("price", 10, 2); // Diganti jadi decimal untuk harga, dengan 2 angka desimal
             $table->string("created_by");
             $table->string("updated_by");
         });
